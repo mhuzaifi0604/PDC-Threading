@@ -2,10 +2,9 @@
 Muhammad Huzaifa
 20I-0604
 Parallel & Distributed Computing
-Assignment # 01 Task # 02
+Assignment # 01 Task # 03
 */
 
-// Including Necessory Libraries
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -14,6 +13,7 @@ Assignment # 01 Task # 02
 // Defining global constant variables
 #define MATRIX_SIZE 1024
 #define NUM_THREADS 4
+#define Block 512
 
 // Defining Global arrays
 int matrix[MATRIX_SIZE][MATRIX_SIZE];
@@ -23,7 +23,6 @@ long distsum = 0;
 // Creating a struct for buffer arrays and distributed sums
 struct Thread_Args
 {
-    int cols_per_thread;
     int **buffer_array;
     int threadid;
     long *thread_sum; // Store the partial sum for each thread
@@ -56,68 +55,73 @@ long Original_Sum()
     return original;
 }
 
-// function for each thread to calculate portion sum of original array
-void *calculateColSum(void *object)
+// function for each thread to calculate Block of original array
+void *calculateBlockSum(void *object)
 {
     // type casting structure object from void * to struct *
     struct Thread_Args *structure = (struct Thread_Args *)object;
     long temp_sum = 0; // Local variable to store the sum
-// Oouter loop each col having 1024 rows
-    for (int i = 0; i < MATRIX_SIZE; i++)
+
+    // Since a block wise distribution outer and inner loop runs 512 times
+    for (int i = 0; i < Block; i++)
     {
-        // inner loop = cols in a sub array since a col wise distribution
-        for (int j = 0; j < structure->cols_per_thread; j++)
+        for (int j = 0; j < Block; j++)
         {
-            temp_sum += structure->buffer_array[i][j]; // Adding sum of array to local variable
+            temp_sum += structure->buffer_array[i][j]; // adding buffer array's sum to lacal variable
         }
     }
 
     // Adding local portion sum into objects thread sum due to thread saftey and accurate sum at the end
     *(structure->thread_sum) = temp_sum;
-    printf("\n \033[1;34m [-] \033[0m Printing Sum of cols: \033[33m%d\033[0m\n\n", temp_sum); // Printing Local portion Sum
+    printf("\n \033[1;34m [-] \033[0m Printing Sum of rows: \033[33m%d\033[0m\n\n", temp_sum); // Printing Local portion Sum
     return NULL;
 }
 
 // functin to copy original array into buffer 
-int **create_buffer(int cols, int start, int end)
+int **create_buffer(int start_row, int end_row, int start_col, int end_col)
 {
-    // Creating a 2D dynamic array having rows = Matrix Size each col having 1024 rows
-    int **buffer = (int **)malloc(MATRIX_SIZE * sizeof(int *));
-    for (int i = 0; i < MATRIX_SIZE; i++)
+    // creating a2D array having rows == 512 for each block
+    int **buffer = (int **)malloc((end_row - start_row) * sizeof(int *));
+    for (int i = start_row; i < end_row; i++)
     {
-        // buffer having cols = cols_per_thread since a col wise distribution
-        buffer[i] = (int *)malloc(cols * sizeof(int));
-        for (int j = start, k = 0; j < end && k < cols; j++, k++)
+        // cols == 512 since block distribution of each block of 512 x 512
+        buffer[i-start_row] = (int *)malloc((end_col - start_col) * sizeof(int));
+        for (int j = start_col; j < end_col; j++)
         {
-            buffer[i][k] = matrix[i][j]; // copying respective portion from original array into a buffer
+            buffer[i-start_row][j-start_col] = matrix[i][j]; // copying respective portion from org array to buffer
         }
     }
     return buffer; // returning buffer to main
 }
 
+
 int main()
 {
     // Initializing original array randomly
     Initialize_array();
+    int count = 0; // count for each thread for sending start and ends of rows and cols and thread creation
     // Creating an array of objects for threads
     struct Thread_Args thread_args[NUM_THREADS];
 
-    for (int i = 0; i < NUM_THREADS; i++)
+    // c raeting a nested loop | only need 4 iterations hence dividing Num_threads / 2
+    for (int i = 0; i < NUM_THREADS/2; i++)
     {
-        // number of cols for each subarray --> 1024 / 4 == 256
-        int cols_per_thread = MATRIX_SIZE / NUM_THREADS;
-        // getting start of cols [ 2 * 256 == 512, 3 * 256 == 768 , so on]
-        int start_col = i * cols_per_thread;
-        int end_col = (i == NUM_THREADS - 1) ? MATRIX_SIZE : (start_col + cols_per_thread);
-
-        // Assigning values to respective variables in thread object
-        thread_args[i].cols_per_thread = cols_per_thread;
-        thread_args[i].threadid = i;
-        thread_args[i].thread_sum = (long *)malloc(sizeof(long)); // Allocate memory for partial sum
-        *(thread_args[i].thread_sum) = 0; // Initialize partial sum to 0
-        thread_args[i].buffer_array = create_buffer(cols_per_thread, start_col, end_col);
-        // creating a thread and passing the respective object from array to calculate sum of portion array
-        pthread_create(&threads[i], NULL, calculateColSum, &thread_args[i]);
+        for (int j = 0; j < NUM_THREADS/2; j++){
+            // Calculating start & end of row for each thread
+            int start_row = j*Block;
+            int end_row = (j==(NUM_THREADS/2) - 1 ) ? MATRIX_SIZE : (j+1)*Block;
+            // Calculating start and end of col for each thread
+            int start_col = i*Block;
+            int end_col = (i==(NUM_THREADS/2)-1) ? MATRIX_SIZE : (i+1) * Block;
+            // Assigning respective variables defined variables in structure above
+            thread_args[count].threadid = count;
+            thread_args[count].thread_sum = (long *)malloc(sizeof(long));
+            *(thread_args[count].thread_sum) = 0;
+            thread_args[count].buffer_array = create_buffer(start_row, end_row, start_col, end_col);
+            // creating a thread and passing the respective object from array to calculate sum of portion array
+            pthread_create(&threads[count], NULL, calculateBlockSum, &thread_args[count]);
+            count += 1;
+        }
     }
     distsum = 0; // Initialize distsum to zero
     for (int i = 0; i < NUM_THREADS; i++)
@@ -126,7 +130,7 @@ int main()
         distsum += *(thread_args[i].thread_sum); // Accumulate the partial sums
         free(thread_args[i].thread_sum); // Free memory allocated for partial sum
     }
-    // getting sum of original array
+    // getting sum of org array
     long Actual_Sum = Original_Sum();
     // Comparing original and distributed Sums
     if (Actual_Sum == distsum)
