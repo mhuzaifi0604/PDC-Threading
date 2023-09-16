@@ -137,13 +137,13 @@ int main()
     {
         printf("\n\t\t\t \033[32m ===============  Threads working fine both sums are equal. =============== \033[0m\n\n");
         printf("\t\t\t\t\tSum of Original Array: %ld\n", Actual_Sum);
-        printf("\t\t\t\t\tSum of C-Sliced Array: %ld\n", distsum);
+        printf("\t\t\t\t\tSum of B-Sliced Array: %ld\n", distsum);
     }
     else
     {
         printf("\n\t\t\t \033[31m =============== Threads working fine but computation mistake. =============== \033[0m \n\n");
         printf("\t\t\t\t\tSum of Original Array: %ld \n", Actual_Sum);
-        printf("\t\t\t\t\tSum of C-Sliced Array: %ld \n", distsum);
+        printf("\t\t\t\t\tSum of B-Sliced Array: %ld \n", distsum);
     }
 
     return 0;

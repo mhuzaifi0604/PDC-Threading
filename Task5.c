@@ -2,7 +2,7 @@
 Muhammad Huzaifa
 20I-0604
 Parallel & Distributed Computing
-Assignment # 01 Task # 04
+Assignment # 01 Task # 05
 */
 
 #include <stdio.h>
@@ -54,20 +54,20 @@ long Original_Sum()
 }
 
 // function for each thread to calculate Block of original array
-void *calculateCyclicRowSum(void *object)
+void *calculateCyclicColSum(void *object)
 {
     // type casting structure object from void * to struct *
     struct Thread_Args *structure = (struct Thread_Args *)object;
     long temp_sum = 0; // Local variable to store the sum
-    //Calculating Sum of the row passed to thread
+    //Calculating Sum of the col passed to thread
     for (int i = 0; i < MATRIX_SIZE; i++)
     {
-            temp_sum += structure->buffer_array[i]; // adding sum of passed row to local variable
+            temp_sum += structure->buffer_array[i]; // adding sum of passed col to local variable
     }
 
     // Adding local sum into objects thread sum due to thread saftey and accurate sum at the end
     *(structure->thread_sum) += temp_sum;
-    printf("\n \033[1;34m [-] \033[0m Printing Sum of rows:  \033[33m%d\033[0m\n\n", temp_sum); // Printing Local row Sum
+    printf("\n \033[1;34m [-] \033[0m Printing Sum of Cols:  \033[33m%d\033[0m\n\n", temp_sum); // Printing Local col Sum
     return NULL;
 }
 
@@ -76,29 +76,29 @@ int main()
 {
     // Initializing original array randomly
     Initialize_array();
-    int buffer [MATRIX_SIZE]; // array for storing each row of original array and then passing it to thread function.
+    int buffer [MATRIX_SIZE]; // array for storing each col of original array and then passing it to thread function.
     // Creating an array of objects for threads
     struct Thread_Args thread_args[NUM_THREADS];
     int num = 0;
     distsum = 0; // Initialize distsum to zero
 
-    // Loop for Cyclic distribution of Rows among 4 Threads 
+    // Loop for Cyclic distribution of cols among 4 Threads 
     for (int i = 0; i < MATRIX_SIZE; i++)
     {
         if(num == 4){ // setting thread number back to 0 if thread exceeds 4 due to 1024 loop size
             num =0;
         }
-        // loop for copying each row of original array into a buffer 
+        // loop for copying each col of original array into a buffer 
         for(int j = 0; j< 1024; j++){
-        thread_args[num].buffer_array[j] = matrix[i][j];
+        thread_args[num].buffer_array[j] = matrix[j][i];
         }
         // Dynamically allocating thread_sum since it will get type casted into void *
         thread_args[num].thread_sum = (long *)malloc(sizeof(long));
         *(thread_args[num].thread_sum) = 0;
-        // creating a thread and passing the respective object from array to calculate sum of row
-        pthread_create(&threads[num], NULL, calculateCyclicRowSum, &thread_args[num]);
+        // creating a thread and passing the respective object from array to calculate sum of col
+        pthread_create(&threads[num], NULL, calculateCyclicColSum, &thread_args[num]);
         pthread_join(threads[num], NULL); // Joining threads in the loop too
-        distsum += *(thread_args[num].thread_sum); // Accumulate the added row sums
+        distsum += *(thread_args[num].thread_sum); // Accumulate the added col sums
         free(thread_args[num].thread_sum); // Free memory allocated for partial sum
         num += 1;
     }
@@ -109,13 +109,13 @@ int main()
     {
         printf("\n\t\t\t \033[32m ===============  Threads working fine both sums are equal. =============== \033[0m\n\n");
         printf("\t\t\t\t\tSum of Original  Array: %ld\n", Actual_Sum);
-        printf("\t\t\t\t\tSum of CR-Sliced Array: %ld\n", distsum);
+        printf("\t\t\t\t\tSum of CC-Sliced Array: %ld\n", distsum);
     }
     else
     {
         printf("\n\t\t\t \033[31m =============== Threads working fine but computation mistake. =============== \033[0m \n\n");
         printf("\t\t\t\t\tSum of Original  Array: %ld \n", Actual_Sum);
-        printf("\t\t\t\t\tSum of CR-Sliced Array: %ld \n", distsum);
+        printf("\t\t\t\t\tSum of CC-Sliced Array: %ld \n", distsum);
     }
 
     return 0;
